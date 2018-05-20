@@ -1,4 +1,5 @@
 defmodule Chat.ConnDispatcher do
+  require Logger
   use GenServer
 
   def start_link(port) do
@@ -11,11 +12,19 @@ defmodule Chat.ConnDispatcher do
       [:binary, packet: :line, active: true, reuseaddr: true])
   end
 
-  def handle_cast(:accept, listenSocket) do
+  defp accept(listenSocket) do
     {:ok, clientSocket} = :gen_tcp.accept(listenSocket)
-    :ok = :gen_tcp.send(clientSocket,
-      "Welcome to The Chat! Please enter your name\r\n")
-    {:noreply, listenSocket}
+    register_client(clientSocket)
+    accept(listenSocket)
   end
 
+  defp register_client(socket) do
+    Chat.ClientRegistrar.register(Chat.ClientRegistrar, socket)
+    :gen_tcp.controlling_process(socket, Process.whereis(Chat.ClientRegistrar))
+  end
+
+  def handle_cast(:accept, listenSocket) do
+    accept(listenSocket)
+    {:noreply, listenSocket}
+  end
 end

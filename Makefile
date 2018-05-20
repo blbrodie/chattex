@@ -1,4 +1,7 @@
-.PHONY: test
+.PHONY: test dialyzer
 
 test:
-	mix test
+	mix test $(test)
+
+dialyzer:
+	mix dialyzer
