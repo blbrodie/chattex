@@ -6,7 +6,16 @@ defmodule Chat.ConnDispatcher do
   end
 
   def init(port) do
-      :gen_tcp.listen(port,
-        [:binary, packet: :line, active: true, reuseaddr: true])
+    GenServer.cast(self(), :accept)
+    :gen_tcp.listen(port,
+      [:binary, packet: :line, active: true, reuseaddr: true])
   end
+
+  def handle_cast(:accept, listenSocket) do
+    {:ok, clientSocket} = :gen_tcp.accept(listenSocket)
+    :ok = :gen_tcp.send(clientSocket,
+      "Welcome to The Chat! Please enter your name\r\n")
+    {:noreply, listenSocket}
+  end
+
 end
