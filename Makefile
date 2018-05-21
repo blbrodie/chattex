@@ -5,3 +5,6 @@ test:
 
 dialyzer:
 	mix dialyzer
+
+run:
+	mix run --no-halt

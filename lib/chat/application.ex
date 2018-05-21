@@ -8,8 +8,9 @@ defmodule Chat.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: Chat.ClientRegistry},
+      {Chat.ChatServer, name: Chat.ChatServer},
+      {DynamicSupervisor, strategy: :one_for_one, name: Chat.ClientServerSup},
       {Chat.ClientRegistrar, name: Chat.ClientRegistrar},
-      # {DynamicSupervisor, strategy: :one_for_one, #  name: Chat.ClientRegisterSupervisor},
       {Chat.ConnDispatcher, 8080}
     ]
 

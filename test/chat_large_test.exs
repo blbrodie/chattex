@@ -63,7 +63,7 @@ defmodule ChatLargeTest do
     {:ok, @connected_with <> " 0 other user(s): []" <> @crlf} =
       recv_from_chat(cs)
 
-    :ok = :gen_tcp.shutdown(cs, :write)
+    :ok = :gen_tcp.close(cs)
 
     {:ok, cs} = connect()
     {:ok, @welcome_msg} = recv_from_chat(cs)
@@ -83,6 +83,56 @@ defmodule ChatLargeTest do
       joins_chat("ben_brodie") |> recv_from_chat()
   end
 
+  test "client broadcasts message to all other users" do
+    alphaSocket = joins_chat("alpha")
+    betaSocket = joins_chat("beta")
+    gammaSocket = joins_chat("gamma")
+
+    benSocket = joins_chat("ben")
+
+    {:ok, _} = recv_from_chat(benSocket)
+
+
+    {:ok, _} = recv_from_chat(alphaSocket)
+    {:ok, _} = recv_from_chat(betaSocket)
+    {:ok, _} = recv_from_chat(gammaSocket)
+
+    send_to_chat(benSocket, "Hello!" <> @crlf)
+
+
+    {:ok, line} = alphaSocket |> recv_from_chat()
+    assert [_ts, "<ben>", "Hello!"] = String.split(line)
+    {:ok, line} = betaSocket |> recv_from_chat()
+    assert [_ts, "<ben>", "Hello!"] = String.split(line)
+    {:ok, line} = gammaSocket |> recv_from_chat()
+    assert [_ts, "<ben>", "Hello!"] = String.split(line)
+    {:ok, line} = benSocket |> recv_from_chat()
+    assert [_ts, "<ben>", "Hello!"] = String.split(line)
+  end
+
+  test "client broadcasts leaves and joins to all other users" do
+    alphaSocket = joins_chat("alpha")
+
+    benSocket = joins_chat("ben")
+
+    {:ok, _} = recv_from_chat(benSocket)
+
+    {:ok, line} = recv_from_chat(alphaSocket, 2)
+    assert [_ts, "*alpha" ,"has" ,"joined", "the", "chat*"] = String.split(line)
+
+    {:ok, line} = recv_from_chat(alphaSocket)
+    assert [_ts, "*ben" ,"has" ,"joined", "the", "chat*"] = String.split(line)
+
+    closes_chat(benSocket)
+
+    {:ok, line} = recv_from_chat(alphaSocket)
+    assert [_ts, "*ben" ,"has" ,"left", "the", "chat*"] = String.split(line)
+  end
+
+  defp closes_chat(socket) do
+    :ok = :gen_tcp.close(socket)
+  end
+
   defp joins_chat(name) do
     {:ok, cs} = connect()
     {:ok, @welcome_msg} = recv_from_chat(cs)
@@ -90,12 +140,18 @@ defmodule ChatLargeTest do
     cs
   end
 
-  defp send_to_chat(socket, text) do
-    :gen_tcp.send(socket, text)
+  defp recv_from_chat(socket, numLines \\ 1)
+  defp recv_from_chat(socket, 1) do
+    :gen_tcp.recv(socket, 0, 1000)
+  end
+  defp recv_from_chat(socket, numLines) do
+    recv_from_chat(socket)
+    recv_from_chat(socket, numLines - 1)
   end
 
-  defp recv_from_chat(socket) do
-      :gen_tcp.recv(socket, 0, 1000)
+
+  defp send_to_chat(socket, text) do
+    :gen_tcp.send(socket, text)
   end
 
   defp connect() do
