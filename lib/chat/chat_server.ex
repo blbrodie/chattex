@@ -31,6 +31,10 @@ defmodule Chat.ChatServer do
     client_pids()
     |> Enum.each(&Chat.ClientServer.push(&1,outgoing))
 
+    mentions(msg)
+    |> Enum.map(&Chat.ClientRegistrar.client_pid(Chat.ClientRegistrar, &1))
+    |> Enum.each(&Chat.ClientServer.push(&1,"\a\r\n"))
+
     {:reply, :ok, [outgoing | Enum.take(state, 9)]}
   end
 
@@ -43,6 +47,10 @@ defmodule Chat.ChatServer do
 
   def handle_call(:recent_msgs, _from, state) do
     {:reply, state, state}
+  end
+
+  def mentions(msg) do
+    List.flatten(Regex.scan(~r/@(\w+)/, msg, capture: :all_but_first))
   end
 
   defp client_pids() do

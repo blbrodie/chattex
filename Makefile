@@ -8,3 +8,6 @@ dialyzer:
 
 run:
 	mix run --no-halt
+
+telnet:
+	telnet localhost 8080

@@ -149,6 +149,22 @@ defmodule ChatLargeTest do
       String.split(([h|_] = msgs; h))
   end
 
+  test "@ben should send a BEL to ben" do
+    alphaSocket = joins_chat("alpha")
+    betaSocket = joins_chat("beta")
+    benSocket = joins_chat("ben")
+
+    recv_all_messages(alphaSocket)
+    recv_all_messages(betaSocket)
+    recv_all_messages(benSocket)
+
+    send_to_chat(alphaSocket, "Hello @ben! Hello @beta." <> @crlf)
+
+    ["\a" <> @crlf, _] = recv_all_messages(benSocket)
+    ["\a" <> @crlf, _] = recv_all_messages(betaSocket)
+    [_] = recv_all_messages(alphaSocket)
+  end
+
   defp recv_all_messages(socket, msgs \\ []) do
     case recv_from_chat(socket) do
       {:ok, msg} -> recv_all_messages(socket, [msg | msgs])

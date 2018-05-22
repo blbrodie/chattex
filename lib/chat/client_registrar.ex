@@ -8,8 +8,6 @@ defmodule Chat.ClientRegistrar do
   end
 
   def init(:ok) do
-    Logger.debug("#{__MODULE__}: starting")
-
     {:ok, {%{},%{}}}
   end
 
@@ -23,12 +21,18 @@ defmodule Chat.ClientRegistrar do
 
   @spec client_name(GenServer.server(), pid()) :: String.t()
   def client_name(server, pid), do: GenServer.call(server, {:client_name, pid})
-    # [name] = Registry.keys(Chat.ClientRegistry, pid)
-    # name
+
+  @spec client_pid(GenServer.server(), String.t()) :: pid()
+  def client_pid(server, name), do: GenServer.call(server, {:client_pid, name})
 
   def handle_call({:client_name, pid}, _from, {_, pids} = state) do
     %{^pid => name} = pids
     {:reply, name, state}
+  end
+
+  def handle_call({:client_pid, name}, _from, {names, _} = state) do
+    %{^name => pid} = names
+    {:reply, pid, state}
   end
 
   def handle_call(:clients, _from, {users,_} = state) do
@@ -67,6 +71,20 @@ defmodule Chat.ClientRegistrar do
     end
   end
 
+  # this can happen between assigning control to the client server process
+  # unless we use {accept, once}
+  def handle_info({:tcp_closed, _socket}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:DOWN, _, :process, pid, _reason}, {names, pids}) do
+    %{^pid => name} = pids
+
+    Chat.ChatServer.broadcast_event(Chat.ChatServer,
+      "*" <> name <> " has left the chat*" <> @crlf)
+    {:noreply, {Map.delete(names, name), Map.delete(pids, pid)}}
+  end
+
   defp request_name(socket) do
     :gen_tcp.send(socket,
       "Welcome to The Chat! Please enter your name." <> @crlf)
@@ -99,19 +117,6 @@ defmodule Chat.ClientRegistrar do
       "You are connected with #{length(users)} other user(s): [#{user_string(users)}]" <> @crlf)
   end
 
-  # this can happen between assigning control to the client server process
-  # unless we use {accept, once}
-  def handle_info({:tcp_closed, socket}, state) do
-    {:noreply, state}
-  end
-
-  def handle_info({:DOWN, _, :process, pid, reason}, {names, pids} = state) do
-    %{^pid => name} = pids
-
-    Chat.ChatServer.broadcast_event(Chat.ChatServer,
-      "*" <> name <> " has left the chat*" <> @crlf)
-    {:noreply, {Map.delete(names, name), Map.delete(pids, pid)}}
-  end
 
   defp user_string(users, str \\ "")
   defp user_string([user], str) do
