@@ -78,9 +78,9 @@ defmodule ChatLargeTest do
     joins_chat("beta")
     joins_chat("gamma")
 
-    assert {:ok, @connected_with <>
-      " 3 other user(s): [alpha, beta, gamma]" <> @crlf} =
-      joins_chat("ben_brodie") |> recv_from_chat()
+    assert [@connected_with <>
+      " 3 other user(s): [alpha, beta, gamma]" <> @crlf,_] =
+      joins_chat("ben_brodie") |> recv_all_messages() |> Enum.reverse
   end
 
   test "client broadcasts message to all other users" do
@@ -90,15 +90,14 @@ defmodule ChatLargeTest do
 
     benSocket = joins_chat("ben")
 
-    {:ok, _} = recv_from_chat(benSocket)
+    recv_all_messages(benSocket)
 
 
-    {:ok, _} = recv_from_chat(alphaSocket)
-    {:ok, _} = recv_from_chat(betaSocket)
-    {:ok, _} = recv_from_chat(gammaSocket)
+    recv_all_messages(alphaSocket)
+    recv_all_messages(betaSocket)
+    recv_all_messages(gammaSocket)
 
     send_to_chat(benSocket, "Hello!" <> @crlf)
-
 
     {:ok, line} = alphaSocket |> recv_from_chat()
     assert [_ts, "<ben>", "Hello!"] = String.split(line)
@@ -129,6 +128,13 @@ defmodule ChatLargeTest do
     assert [_ts, "*ben" ,"has" ,"left", "the", "chat*"] = String.split(line)
   end
 
+  defp recv_all_messages(socket, msgs \\ []) do
+    case recv_from_chat(socket) do
+      {:ok, msg} -> recv_all_messages(socket, [msg | msgs])
+      {:error, :timeout} -> msgs
+    end
+  end
+
   defp closes_chat(socket) do
     :ok = :gen_tcp.close(socket)
   end
@@ -142,7 +148,7 @@ defmodule ChatLargeTest do
 
   defp recv_from_chat(socket, numLines \\ 1)
   defp recv_from_chat(socket, 1) do
-    :gen_tcp.recv(socket, 0, 1000)
+    :gen_tcp.recv(socket, 0, 100)
   end
   defp recv_from_chat(socket, numLines) do
     recv_from_chat(socket)
