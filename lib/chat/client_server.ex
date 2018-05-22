@@ -17,8 +17,10 @@ defmodule Chat.ClientServer do
   end
 
   def handle_cast({:push, packet}, socket) do
-    :ok = :gen_tcp.send(socket, packet)
-    {:noreply, socket}
+    case :gen_tcp.send(socket, packet) do
+      :ok -> {:noreply, socket}
+      {:error, :closed} -> {:stop, :normal, socket}
+    end
   end
 
 
