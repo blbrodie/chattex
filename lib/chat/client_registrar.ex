@@ -46,32 +46,57 @@ defmodule Chat.ClientRegistrar do
   end
 
   defp req_register(socket) do
-    :gen_tcp.send(socket,
-      "Welcome to The Chat! Please enter your name." <> @crlf)
+    request_name(socket)
   end
 
   def handle_info({:tcp, socket, data}, {names, pids} = state) do
     [name|_] = String.split(data)
 
     case names do
-      %{^name => _} ->
-        :gen_tcp.send(socket,
-          "The nickname #{name} already exists. " <>
-          "Please choose a new nickname." <> @crlf)
+      %{^name => _} -> request_new_name(socket, name)
         {:noreply, state}
       _ ->
         {:ok, pid} =
           DynamicSupervisor.start_child(
             Chat.ClientServerSup, {Chat.ClientServer, {socket, []}})
-        Process.monitor(pid)
-        users = (for {other, _} <- names, other != name, do: other)
-        :gen_tcp.send(socket,
-          "You are connected with #{length(users)} other user(s): [#{user_string(users)}]" <> @crlf)
-        :gen_tcp.controlling_process(socket, pid)
-        Chat.ChatServer.broadcast_event(Chat.ChatServer,
-          "*" <> name <> " has joined the chat*" <> @crlf)
+        send_welcome_msg(name, names, socket)
+        send_most_recent_msgs(socket)
+        hand_over_control(socket, pid)
+        broadcast_join(name)
         {:noreply, {Map.put(names, name, pid), Map.put(pids, pid, name)}}
     end
+  end
+
+  defp request_name(socket) do
+    :gen_tcp.send(socket,
+      "Welcome to The Chat! Please enter your name." <> @crlf)
+  end
+
+  defp request_new_name(socket, name) do
+    :gen_tcp.send(socket,
+      "The nickname #{name} already exists. " <>
+        "Please choose a new nickname." <> @crlf)
+  end
+
+  defp broadcast_join(name) do
+    Chat.ChatServer.broadcast_event(Chat.ChatServer,
+      "*" <> name <> " has joined the chat*" <> @crlf)
+  end
+
+  defp hand_over_control(socket, pid) do
+    Process.monitor(pid)
+    :gen_tcp.controlling_process(socket, pid)
+  end
+
+  defp send_most_recent_msgs(socket) do
+    Chat.ChatServer.recent_msgs(Chat.ChatServer)
+    |> (fn(msg) -> :gen_tcp.send(socket,msg) end).()
+  end
+
+  defp send_welcome_msg(name, names, socket) do
+    users = (for {other, _} <- names, other != name, do: other)
+    :gen_tcp.send(socket,
+      "You are connected with #{length(users)} other user(s): [#{user_string(users)}]" <> @crlf)
   end
 
   # this can happen between assigning control to the client server process

@@ -9,6 +9,11 @@ defmodule Chat.ChatServer do
     {:ok, []}
   end
 
+  @spec recent_msgs(GenServer.server()) :: [String.t()]
+  def recent_msgs(server) do
+    GenServer.call(server, :recent_msgs)
+  end
+
   @spec broadcast(GenServer.server(), pid(), String.t()) :: :ok
   def broadcast(server, from, msg) do
     name = Chat.ClientRegistrar.client_name(Chat.ClientRegistrar, from)
@@ -21,17 +26,23 @@ defmodule Chat.ChatServer do
   end
 
   def handle_call({:broadcast, {name, msg}}, _from, state) do
-    client_pids()
-    |> Enum.each(&Chat.ClientServer.push(&1,construct_msg({name, msg})))
+    outgoing = construct_msg({name, msg})
 
-    {:reply, :ok, state}
+    client_pids()
+    |> Enum.each(&Chat.ClientServer.push(&1,outgoing))
+
+    {:reply, :ok, [outgoing | Enum.take(state, 9)]}
   end
 
   def handle_cast({:broadcast_event, event}, state) do
     client_pids()
     |> Enum.each(&Chat.ClientServer.push(&1, ts() <> event))
 
-    {:noreply, state}
+    {:noreply, [ts() <> event | Enum.take(state,9)]}
+  end
+
+  def handle_call(:recent_msgs, _from, state) do
+    {:reply, state, state}
   end
 
   defp client_pids() do

@@ -11,7 +11,7 @@ defmodule Chat.ClientServer do
     {:ok, socket}
   end
 
-  @spec push(GenServer.server(), {name :: String.t(), msg :: String.t()}) :: :ok
+  @spec push(GenServer.server(), String.t()) :: :ok
   def push(server, packet) do
     GenServer.cast(server, {:push, packet})
   end

@@ -78,9 +78,9 @@ defmodule ChatLargeTest do
     joins_chat("beta")
     joins_chat("gamma")
 
-    assert [@connected_with <>
-      " 3 other user(s): [alpha, beta, gamma]" <> @crlf,_] =
-      joins_chat("ben_brodie") |> recv_all_messages() |> Enum.reverse
+    assert {:ok, @connected_with <>
+      " 3 other user(s): [alpha, beta, gamma]" <> @crlf} =
+      joins_chat("ben_brodie") |> recv_from_chat()
   end
 
   test "client broadcasts message to all other users" do
@@ -126,6 +126,29 @@ defmodule ChatLargeTest do
 
     {:ok, line} = recv_from_chat(alphaSocket)
     assert [_ts, "*ben" ,"has" ,"left", "the", "chat*"] = String.split(line)
+  end
+
+  test "client receives the most recent 10 messages in the chat" do
+    alphaSocket = joins_chat("alpha")
+    betaSocket = joins_chat("beta")
+
+    recv_all_messages(alphaSocket)
+    recv_all_messages(betaSocket)
+
+    for i <- 1..4, do: send_to_chat(alphaSocket, "Hello #{i}" <> @crlf)
+    for i <- 1..4, do: send_to_chat(betaSocket, "Hello #{i}" <> @crlf)
+
+    benSocket = joins_chat("ben")
+    recv_from_chat(benSocket) #welcome message
+
+    msgs = recv_all_messages(benSocket)
+
+    assert length(msgs) === 10
+
+    [msg | t] = msgs
+
+    assert [_ts, "<alpha>" , "Hello 4"] = String.split(msg)
+    assert [_ts, "*alpha" ,"has" ,"joined", "the", "chat*"] = String.split(List.last(msg))
   end
 
   defp recv_all_messages(socket, msgs \\ []) do
