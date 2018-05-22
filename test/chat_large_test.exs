@@ -118,7 +118,6 @@ defmodule ChatLargeTest do
 
     {:ok, line} = recv_from_chat(alphaSocket, 2)
     assert [_ts, "*alpha" ,"has" ,"joined", "the", "chat*"] = String.split(line)
-
     {:ok, line} = recv_from_chat(alphaSocket)
     assert [_ts, "*ben" ,"has" ,"joined", "the", "chat*"] = String.split(line)
 
@@ -141,14 +140,13 @@ defmodule ChatLargeTest do
     benSocket = joins_chat("ben")
     recv_from_chat(benSocket) #welcome message
 
-    msgs = recv_all_messages(benSocket)
+    [_|msgs] = recv_all_messages(benSocket) #ignore my join message
 
     assert length(msgs) === 10
 
-    [msg | t] = msgs
-
-    assert [_ts, "<alpha>" , "Hello 4"] = String.split(msg)
-    assert [_ts, "*alpha" ,"has" ,"joined", "the", "chat*"] = String.split(List.last(msg))
+    assert [_ts, "<beta>" , "Hello", "4"] = String.split(List.last(msgs))
+    assert [_ts, "*alpha" ,"has" ,"joined", "the", "chat*"] =
+      String.split(([h|_] = msgs; h))
   end
 
   defp recv_all_messages(socket, msgs \\ []) do
